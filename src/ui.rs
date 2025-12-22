@@ -9,7 +9,7 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(3), // Title
-            Constraint::Min(3),    // Input Box
+            Constraint::Max(3),    // Input Box
             Constraint::Min(3),    // Logs Widget
         ])
         .split(frame.area());

@@ -1,9 +1,7 @@
+use crate::app::{App, InputMode};
 use ratatui::{
-    layout::{Constraint, Direction, Layout},
-    widgets::{Block, Borders, Gauge, Paragraph},
-    Frame,
+    Frame, layout::{Constraint, Direction, Layout}, style::{Color, Style}, widgets::{Block, Borders, Gauge, List, ListItem, Paragraph}
 };
-use crate::app::App;
 
 pub fn render(app: &mut App, frame: &mut Frame) {
     // Define a simple layout: Top for title, Bottom for stats
@@ -11,7 +9,8 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(3), // Title
-            Constraint::Min(0),    // Main Content
+            Constraint::Min(3),    // Input Box
+            Constraint::Min(3),    // Logs Widget
         ])
         .split(frame.area());
 
@@ -20,11 +19,32 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         .block(Block::default().borders(Borders::ALL));
     frame.render_widget(title, chunks[0]);
 
-    // A Gauge widget to show our "CPU" state
-    let gauge = Gauge::default()
-        .block(Block::default().title(" CPU Usage ").borders(Borders::ALL))
-        .gauge_style(ratatui::style::Style::default().fg(ratatui::style::Color::Cyan))
-        .percent(app.cpu_usage as u16);
-    
-    frame.render_widget(gauge, chunks[1]);
+    // Render Input Box
+    let input_style = match app.input_mode {
+        InputMode::Normal => Style::default(),
+        InputMode::Edit => Style::default().fg(Color::Yellow),
+    };
+
+    let input_box = Paragraph::new(app.log_file_input.as_str())
+            .style(input_style)
+            .block(Block::default()
+                .borders(Borders::ALL)
+                .title(format!(" Tail File (Press 'e' to edit, 'Esc' to cancel): {} ", app.current_path)));
+        
+    frame.render_widget(input_box, chunks[1]);
+
+    // Render Logs Widget
+    let logs_guard = app.logs.try_lock();
+    let log_items: Vec<ListItem> = match &logs_guard {
+        Ok(logs) => logs.iter().map(|l| ListItem::new(l.as_str())).collect(),
+        Err(_) => vec![ListItem::new("Loading logs...")],
+    };
+
+    let log_list = List::new(log_items).block(
+        Block::default()
+            .title(" System Logs ")
+            .borders(Borders::ALL),
+    );
+
+    frame.render_widget(log_list, chunks[2]);
 }

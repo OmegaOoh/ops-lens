@@ -1,17 +1,25 @@
-use std::{io, time::{Duration, Instant}};
 use crossterm::{
-    event::{self, Event, KeyCode},
+    event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
-use ratatui::{backend::CrosstermBackend, Terminal};
+use ratatui::{Terminal, backend::CrosstermBackend};
+use std::{
+    io,
+    time::{Duration, Instant},
+};
 
 mod app;
+mod log;
 mod ui;
 
-use crate::app::App;
+use crate::{
+    app::{App, InputMode},
+    log::LogReader,
+};
 
-fn main() -> Result<(), io::Error> {
+#[tokio::main]
+async fn main() -> Result<(), io::Error> {
     // 1. Setup Terminal
     enable_raw_mode()?;
     let mut stdout = io::stdout();
@@ -28,20 +36,14 @@ fn main() -> Result<(), io::Error> {
     while app.running {
         terminal.draw(|f| ui::render(&mut app, f))?;
 
-        let timeout = tick_rate
-            .checked_sub(last_tick.elapsed())
-            .unwrap_or_else(|| Duration::from_secs(0));
-
-        if event::poll(timeout)? {
+        let timeout = tick_rate.saturating_sub(last_tick.elapsed());
+        if crossterm::event::poll(timeout)? {
             if let Event::Key(key) = event::read()? {
-                if let KeyCode::Char('q') = key.code {
-                    app.quit();
-                }
+                handle_key_event(&mut app, key);
             }
         }
 
         if last_tick.elapsed() >= tick_rate {
-            app.tick();
             last_tick = Instant::now();
         }
     }
@@ -52,4 +54,49 @@ fn main() -> Result<(), io::Error> {
     terminal.show_cursor()?;
 
     Ok(())
+}
+
+fn handle_key_event(app: &mut App, key: KeyEvent) {
+    // Only process Press events, ignore Release and Repeat
+    if key.kind != KeyEventKind::Press {
+        return;
+    }
+
+    match app.input_mode {
+        InputMode::Normal => match key.code {
+            KeyCode::Char('e') => {
+                // Press 'e' to edit path
+                app.input_mode = InputMode::Edit;
+            }
+            KeyCode::Char('q') => {
+                app.quit();
+            }
+            _ => {}
+        },
+        InputMode::Edit => match key.code {
+            KeyCode::Enter => {
+                let path = app.log_file_input.drain(..).collect::<String>();
+                app.current_path = path.clone();
+                app.input_mode = InputMode::Normal;
+
+                // TRIGGER LOG RESTART
+                let logs_ptr = app.logs.clone();
+                tokio::spawn(async move {
+                    // Clear old logs when switching files
+                    logs_ptr.lock().await.clear();
+                    let _ = LogReader::tail_file(&path, logs_ptr).await;
+                });
+            }
+            KeyCode::Char(c) => {
+                app.log_file_input.push(c);
+            }
+            KeyCode::Backspace => {
+                app.log_file_input.pop();
+            }
+            KeyCode::Esc => {
+                app.input_mode = InputMode::Normal;
+            }
+            _ => {}
+        },
+    }
 }

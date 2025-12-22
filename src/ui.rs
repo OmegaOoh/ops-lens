@@ -1,6 +1,9 @@
 use crate::app::{App, InputMode};
 use ratatui::{
-    Frame, layout::{Constraint, Direction, Layout}, style::{Color, Style}, widgets::{Block, Borders, Gauge, List, ListItem, Paragraph}
+    Frame,
+    layout::{Constraint, Direction, Layout},
+    style::{Color, Style},
+    widgets::{Block, Borders, Gauge, List, ListItem, Paragraph},
 };
 
 pub fn render(app: &mut App, frame: &mut Frame) {
@@ -26,25 +29,24 @@ pub fn render(app: &mut App, frame: &mut Frame) {
     };
 
     let input_box = Paragraph::new(app.log_file_input.as_str())
-            .style(input_style)
-            .block(Block::default()
-                .borders(Borders::ALL)
-                .title(format!(" Tail File (Press 'e' to edit, 'Esc' to cancel): {} ", app.current_path)));
-        
+        .style(input_style)
+        .block(Block::default().borders(Borders::ALL).title(format!(
+            " Tail File (Press 'e' to edit, 'Esc' to cancel): {} ",
+            app.current_path
+        )));
+
     frame.render_widget(input_box, chunks[1]);
 
     // Render Logs Widget
     let logs_guard = app.logs.try_lock();
-    let log_items: Vec<ListItem> = match &logs_guard {
-        Ok(logs) => logs.iter().map(|l| ListItem::new(l.as_str())).collect(),
-        Err(_) => vec![ListItem::new("Loading logs...")],
-    };
+    if let Ok(logs) = logs_guard {
+        let log_items: Vec<ListItem> = logs.iter().map(|l| ListItem::new(l.as_str())).collect();
 
-    let log_list = List::new(log_items).block(
-        Block::default()
-            .title(" System Logs ")
-            .borders(Borders::ALL),
-    );
+        let log_list = List::new(log_items)
+            .block(Block::default().title(" Logs ").borders(Borders::ALL))
+            .highlight_style(Style::default().bg(Color::DarkGray)) // Visual cue for selection
+            .highlight_symbol(">> ");
 
-    frame.render_widget(log_list, chunks[2]);
+        frame.render_stateful_widget(log_list, chunks[2], &mut app.scroll_state);
+    }
 }

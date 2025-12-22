@@ -71,6 +71,8 @@ fn handle_key_event(app: &mut App, key: KeyEvent) {
             KeyCode::Char('q') => {
                 app.quit();
             }
+            KeyCode::Char('k') => app.scroll_up(),
+            KeyCode::Char('j') => app.scroll_down(),
             _ => {}
         },
         InputMode::Edit => match key.code {

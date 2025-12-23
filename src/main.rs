@@ -37,9 +37,12 @@ async fn main() -> Result<(), io::Error> {
         terminal.draw(|f| ui::render(&mut app, f))?;
 
         let timeout = tick_rate.saturating_sub(last_tick.elapsed());
+
+        let mut current_log_task: Option<tokio::task::JoinHandle<()>> = None;
+
         if crossterm::event::poll(timeout)? {
             if let Event::Key(key) = event::read()? {
-                handle_key_event(&mut app, key);
+                handle_key_event(&mut app, key, &mut current_log_task);
             }
         }
 
@@ -56,7 +59,11 @@ async fn main() -> Result<(), io::Error> {
     Ok(())
 }
 
-fn handle_key_event(app: &mut App, key: KeyEvent) {
+fn handle_key_event(
+    app: &mut App,
+    key: KeyEvent,
+    current_log_task: &mut Option<tokio::task::JoinHandle<()>>,
+) {
     // Only process Press events, ignore Release and Repeat
     if key.kind != KeyEventKind::Press {
         return;
@@ -78,16 +85,53 @@ fn handle_key_event(app: &mut App, key: KeyEvent) {
         InputMode::Edit => match key.code {
             KeyCode::Enter => {
                 let path = app.log_file_input.drain(..).collect::<String>();
+
+                // Clear previous error
+                app.clear_error();
+
+                // Validate file path is not empty
+                if path.trim().is_empty() {
+                    app.set_error("File path cannot be empty".to_string());
+                    app.input_mode = InputMode::Normal;
+                    return;
+                }
+
+                // Check if file exists
+                if !std::path::Path::new(&path).exists() {
+                    app.set_error(format!("File not found: '{}'", path));
+                    app.input_mode = InputMode::Normal;
+                    return;
+                }
+
+                // Check if it's actually a file (not a directory)
+                match std::path::Path::new(&path).metadata() {
+                    Ok(metadata) if !metadata.is_file() => {
+                        app.set_error(format!("'{}' is not a file", path));
+                        app.input_mode = InputMode::Normal;
+                        return;
+                    }
+                    Err(e) => {
+                        app.set_error(format!("Cannot access file '{}': {}", path, e));
+                        app.input_mode = InputMode::Normal;
+                        return;
+                    }
+                    _ => {}
+                }
+
+                // All validation passed, proceed with loading the file
+                if let Some(handle) = current_log_task.take() {
+                    handle.abort(); // Kill old log reader task.
+                }
+
                 app.current_path = path.clone();
                 app.input_mode = InputMode::Normal;
 
-                // TRIGGER LOG RESTART
                 let logs_ptr = app.logs.clone();
-                tokio::spawn(async move {
+                *current_log_task = Some(tokio::spawn(async move {
                     // Clear old logs when switching files
                     logs_ptr.lock().await.clear();
                     let _ = LogReader::tail_file(&path, logs_ptr).await;
-                });
+                }));
             }
             KeyCode::Char(c) => {
                 app.log_file_input.push(c);

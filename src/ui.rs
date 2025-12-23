@@ -3,18 +3,30 @@ use ratatui::{
     Frame,
     layout::{Constraint, Direction, Layout},
     style::{Color, Style},
-    widgets::{Block, Borders, Gauge, List, ListItem, Paragraph},
+    widgets::{Block, Borders, List, ListItem, Paragraph},
 };
 
 pub fn render(app: &mut App, frame: &mut Frame) {
-    // Define a simple layout: Top for title, Bottom for stats
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
+    // Define layout based on whether there's an error
+    let constraints = if app.error_message.is_some() {
+        vec![
+            Constraint::Length(3), // Title
+            Constraint::Max(3),    // Input Box
+            Constraint::Length(3), // Error Message
+            Constraint::Min(1),    // Logs Widget
+        ]
+    } else {
+        vec![
             Constraint::Length(3), // Title
             Constraint::Max(3),    // Input Box
             Constraint::Min(3),    // Logs Widget
-        ])
+        ]
+    };
+
+    // Define a simple layout: Top for title, Bottom for stats
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(constraints)
         .split(frame.area());
 
     // Title Widget
@@ -37,6 +49,16 @@ pub fn render(app: &mut App, frame: &mut Frame) {
 
     frame.render_widget(input_box, chunks[1]);
 
+    // Render Error Message if present
+    let mut log_chunk_index = 2;
+    if let Some(error_msg) = &app.error_message {
+        let error_widget = Paragraph::new(error_msg.as_str())
+            .style(Style::default().fg(Color::Red))
+            .block(Block::default().borders(Borders::ALL).title(" Error "));
+        frame.render_widget(error_widget, chunks[2]);
+        log_chunk_index = 3;
+    }
+
     // Render Logs Widget
     let logs_guard = app.logs.try_lock();
     if let Ok(logs) = logs_guard {
@@ -47,6 +69,6 @@ pub fn render(app: &mut App, frame: &mut Frame) {
             .highlight_style(Style::default().bg(Color::DarkGray)) // Visual cue for selection
             .highlight_symbol(">> ");
 
-        frame.render_stateful_widget(log_list, chunks[2], &mut app.scroll_state);
+        frame.render_stateful_widget(log_list, chunks[log_chunk_index], &mut app.scroll_state);
     }
 }

@@ -15,6 +15,7 @@ pub struct App {
     pub logs: Arc<Mutex<Vec<String>>>,
     pub current_path: String,
     pub scroll_state: ListState,
+    pub error_message: Option<String>,
 }
 
 impl App {
@@ -26,6 +27,7 @@ impl App {
             logs: Arc::new(Mutex::new(Vec::new())),
             current_path: String::from("No file selected"),
             scroll_state: ListState::default(),
+            error_message: None,
         }
     }
 
@@ -53,5 +55,13 @@ impl App {
 
     pub fn quit(&mut self) {
         self.running = false;
+    }
+
+    pub fn set_error(&mut self, message: String) {
+        self.error_message = Some(message);
+    }
+
+    pub fn clear_error(&mut self) {
+        self.error_message = None;
     }
 }

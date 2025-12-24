@@ -1,0 +1,14 @@
+# ops-lens Configuration File
+# This file contains settings for keybinds and log level display
+
+[keybinds]
+# Navigation and control keybinds
+quit = "q"              # Quit the application
+edit = "e"              # Edit the log file path
+scroll_up = "k"         # Scroll up in the log view
+scroll_down = "j"       # Scroll down in the log view
+
+[log_level]
+# Log level indicator settings
+enabled = true                      # Enable/disable log level indicator
+indicator_position = "top"          # Position: "top" or "bottom"

@@ -3,6 +3,8 @@ use std::sync::Arc;
 use ratatui::widgets::ListState;
 use tokio::sync::Mutex;
 
+use crate::config::Config;
+
 pub enum InputMode {
     Normal,
     Edit,
@@ -20,6 +22,7 @@ pub struct App {
     pub viewport_height: usize, // Track the current viewport height
     pub auto_scroll: bool,
     pub error_message: Option<String>,
+    pub config: Config,
 }
 
 impl App {
@@ -36,6 +39,7 @@ impl App {
             viewport_height: 0,
             auto_scroll: true,
             error_message: None,
+            config: Config::load_or_create("ops-lens.toml"),
         }
     }
 

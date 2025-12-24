@@ -8,23 +8,22 @@ use ratatui::{
 };
 
 pub fn render(app: &mut App, frame: &mut Frame) {
-    // Define layout based on whether there's an error
-    let constraints = if app.error_message.is_some() {
-        vec![
-            Constraint::Length(3), // Title
-            Constraint::Max(3),    // Input Box
-            Constraint::Length(3), // Error Message
-            Constraint::Min(1),    // Logs Widget
-        ]
-    } else {
-        vec![
-            Constraint::Length(3), // Title
-            Constraint::Max(3),    // Input Box
-            Constraint::Min(3),    // Logs Widget
-        ]
-    };
+    // Define layout: Title, Input Box, Error (optional), Logs, Notice, Keybinds
+    let mut constraints = vec![
+        Constraint::Length(3), // Title
+        Constraint::Max(3),    // Input Box
+    ];
 
-    // Define a simple layout: Top for title, Bottom for stats
+    if app.error_message.is_some() {
+        constraints.push(Constraint::Length(3)); // Error Message
+    }
+
+    constraints.extend(vec![
+        Constraint::Min(3),    // Logs Widget
+        Constraint::Length(1), // Notice Message
+        Constraint::Length(1), // Keybinds Help
+    ]);
+
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints(constraints)
@@ -59,6 +58,10 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         frame.render_widget(error_widget, chunks[2]);
         log_chunk_index = 3;
     }
+
+    // Calculate indices for notice and keybinds (last two rows)
+    let notice_index = chunks.len() - 2;
+    let keybinds_index = chunks.len() - 1;
 
     // Render Logs Widget
     let logs_guard = app.logs.try_lock();
@@ -123,6 +126,36 @@ pub fn render(app: &mut App, frame: &mut Frame) {
 
         frame.render_stateful_widget(log_list, chunks[log_chunk_index], &mut state);
     }
+
+    // Render Notice Message (second line from bottom)
+    let notice_text = get_notice_message(app);
+    let notice_widget = Paragraph::new(notice_text)
+        .style(Style::default().fg(Color::Cyan))
+        .alignment(ratatui::layout::Alignment::Left);
+    frame.render_widget(notice_widget, chunks[notice_index]);
+
+    // Render Keybinds Help (last line)
+    let keybinds_text = get_keybinds_help(app);
+    let keybinds_widget = Paragraph::new(keybinds_text)
+        .style(Style::default().fg(Color::Gray))
+        .alignment(ratatui::layout::Alignment::Left);
+    frame.render_widget(keybinds_widget, chunks[keybinds_index]);
+}
+
+fn get_notice_message(_app: &App) -> String {
+    // You can customize this to show different messages
+    // For example: config loaded, file changed, etc.
+    "✓ Configuration loaded successfully | Ready to tail logs".to_string()
+}
+
+fn get_keybinds_help(app: &App) -> String {
+    format!(
+        "[{}] quit | [{}] edit | [{}] scroll-up | [{}] scroll-down",
+        app.config.keybinds.quit,
+        app.config.keybinds.edit,
+        app.config.keybinds.scroll_up,
+        app.config.keybinds.scroll_down
+    )
 }
 
 // TODO: Allow Configuration (.toml)

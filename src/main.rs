@@ -10,6 +10,7 @@ use std::{
 };
 
 mod app;
+mod config;
 mod keybinds;
 mod log;
 mod ui;

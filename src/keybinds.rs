@@ -14,19 +14,25 @@ pub async fn handle_key_event(
         return;
     }
 
+    let config = app.config.clone();
+
     match app.input_mode {
-        InputMode::Normal => match key.code {
-            KeyCode::Char('e') => {
-                // Press 'e' to edit path
-                app.input_mode = InputMode::Edit;
-            }
-            KeyCode::Char('q') => {
+        InputMode::Normal => {
+            let key_char = match key.code {
+                KeyCode::Char(c) => c.to_string(),
+                _ => String::new(),
+            };
+
+            if key_char == config.keybinds.quit {
                 app.quit();
+            } else if key_char == config.keybinds.edit {
+                app.input_mode = InputMode::Edit;
+            } else if key_char == config.keybinds.scroll_up {
+                app.scroll_up().await;
+            } else if key_char == config.keybinds.scroll_down {
+                app.scroll_down().await;
             }
-            KeyCode::Char('k') => app.scroll_up().await,
-            KeyCode::Char('j') => app.scroll_down().await,
-            _ => {}
-        },
+        }
         InputMode::Edit => match key.code {
             KeyCode::Enter => {
                 let path = app.log_file_input.drain(..).collect::<String>();

@@ -2,7 +2,8 @@ use crate::app::{App, InputMode};
 use ratatui::{
     Frame,
     layout::{Constraint, Direction, Layout},
-    style::{Color, Style},
+    style::{Color, Modifier, Style},
+    text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, Paragraph},
 };
 
@@ -62,7 +63,10 @@ pub fn render(app: &mut App, frame: &mut Frame) {
     // Render Logs Widget
     let logs_guard = app.logs.try_lock();
     if let Ok(logs) = logs_guard {
-        let log_items: Vec<ListItem> = logs.iter().map(|l| ListItem::new(l.as_str())).collect();
+        let log_items: Vec<ListItem> = logs
+            .iter()
+            .map(|l| ListItem::new(format_log_line(l)))
+            .collect();
 
         let log_list = List::new(log_items)
             .block(Block::default().title(" Logs ").borders(Borders::ALL))
@@ -70,5 +74,35 @@ pub fn render(app: &mut App, frame: &mut Frame) {
             .highlight_symbol(">> ");
 
         frame.render_stateful_widget(log_list, chunks[log_chunk_index], &mut app.scroll_state);
+    }
+}
+
+fn format_log_line(line: &str) -> Line {
+    let (level, color) = if line.to_uppercase().contains("ERROR") || line.contains(" SEV ") {
+        (" ERROR ", Color::Red)
+    } else if line.to_uppercase().contains("WARN") {
+        (" WARN  ", Color::Yellow)
+    } else if line.to_uppercase().contains("INFO") {
+        (" INFO  ", Color::Green)
+    } else if line.to_uppercase().contains("DEBUG") {
+        (" DEBUG ", Color::Blue)
+    } else {
+        ("", Color::White) // Default for lines without a clear level
+    };
+
+    if level.is_empty() {
+        Line::from(Span::raw(line))
+    } else {
+        Line::from(vec![
+            Span::styled(
+                level,
+                Style::default()
+                    .bg(color)
+                    .fg(Color::Black)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::raw(" "),
+            Span::styled(line, Style::default().fg(color)),
+        ])
     }
 }

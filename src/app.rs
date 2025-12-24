@@ -50,22 +50,6 @@ impl App {
         self.auto_scroll = true;
     }
 
-    pub async fn scroll_to_bottom(&mut self) {
-        let logs = self.logs.lock().await;
-        if !logs.is_empty() {
-            let last_index = logs.len().saturating_sub(1);
-            self.scroll_offset = last_index;
-            self.scroll_state.select(Some(last_index));
-        }
-    }
-
-    pub async fn auto_scroll_to_bottom(&mut self) {
-        let logs = self.logs.lock().await;
-        let last_index = logs.len().saturating_sub(1);
-        self.scroll_offset = last_index;
-        self.scroll_state.select(Some(last_index));
-    }
-
     pub async fn scroll_down(&mut self) {
         let logs = self.logs.lock().await;
         let logs_len = logs.len();
@@ -110,23 +94,6 @@ impl App {
             // Cursor is at top of viewport, scroll the offset up
             self.scroll_offset -= 1;
         }
-    }
-
-    pub fn clamp_cursor(&mut self, logs_len: usize, viewport_height: usize) {
-        // Allow cursor to move until EOF indicator is at the bottom of the viewport
-        if logs_len == 0 {
-            self.viewport_cursor = 0;
-            return;
-        }
-
-        let remaining_logs = logs_len.saturating_sub(self.scroll_offset);
-        let max_cursor = if remaining_logs > 0 {
-            remaining_logs.min(viewport_height - 1)
-        } else {
-            0
-        };
-
-        self.viewport_cursor = self.viewport_cursor.min(max_cursor);
     }
 
     pub fn quit(&mut self) {

@@ -1,14 +1,40 @@
-# ops-lens Configuration File
-# This file contains settings for keybinds and log level display
-
 [keybinds]
-# Navigation and control keybinds
-quit = "q"              # Quit the application
-edit = "e"              # Edit the log file path
-scroll_up = "k"         # Scroll up in the log view
-scroll_down = "j"       # Scroll down in the log view
+quit = "q"
+edit = "e"
+scroll_up = "k"
+scroll_down = "j"
 
 [log_level]
-# Log level indicator settings
-enabled = true                      # Enable/disable log level indicator
-indicator_position = "top"          # Position: "top" or "bottom"
+enabled = true
+indicator_position = "top"
+show_level_counts = true
+
+[log_level.levels.error]
+patterns = [
+    "ERROR",
+    "SEV",
+    "CRITICAL",
+]
+color = "red"
+display_name = "ERROR "
+
+[log_level.levels.warning]
+patterns = [
+    "WARN",
+    "WARNING",
+]
+color = "yellow"
+display_name = "WARN  "
+
+[log_level.levels.info]
+patterns = ["INFO"]
+color = "green"
+display_name = "INFO  "
+
+[log_level.levels.debug]
+patterns = [
+    "DEBUG",
+    "TRACE",
+]
+color = "blue"
+display_name = "DEBUG "

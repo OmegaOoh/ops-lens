@@ -7,21 +7,50 @@ use ratatui::{
     widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
 };
 
+fn string_to_color(color_str: &str) -> Color {
+    match color_str.to_lowercase().as_str() {
+        "red" => Color::Red,
+        "yellow" => Color::Yellow,
+        "green" => Color::Green,
+        "blue" => Color::Blue,
+        "cyan" => Color::Cyan,
+        "magenta" => Color::Magenta,
+        "white" => Color::White,
+        "gray" | "grey" => Color::Gray,
+        "dark_gray" | "dark_grey" => Color::DarkGray,
+        _ => Color::White,
+    }
+}
+
 pub fn render(app: &mut App, frame: &mut Frame) {
-    // Define layout: Title, Input Box, Error (optional), Logs, Notice, Keybinds
+    // Define layout with optional log level indicator
     let mut constraints = vec![
-        Constraint::Length(3), // Title
-        Constraint::Max(3),    // Input Box
+        Constraint::Length(3), // 0: Title
+        Constraint::Max(3),    // 1: Input Box
     ];
 
-    if app.error_message.is_some() {
-        constraints.push(Constraint::Length(3)); // Error Message
+    let log_level_top_enabled =
+        app.config.log_level.enabled && app.config.log_level.indicator_position == "top";
+    let log_level_bottom_enabled =
+        app.config.log_level.enabled && app.config.log_level.indicator_position == "bottom";
+
+    // Add log level indicator if enabled and position is "top"
+    if log_level_top_enabled {
+        constraints.push(Constraint::Length(1)); // 2: Log Level Indicator (top)
     }
 
+    let logs_chunk_index = constraints.len();
+    constraints.push(Constraint::Min(3)); // Logs Widget
+
+    // Add log level indicator if enabled and position is "bottom"
+    if log_level_bottom_enabled {
+        constraints.push(Constraint::Length(1)); // Log Level Indicator (bottom)
+    }
+
+    let error_chunk_index = constraints.len();
     constraints.extend(vec![
-        Constraint::Min(3),    // Logs Widget
-        Constraint::Length(1), // Notice Message
-        Constraint::Length(1), // Keybinds Help
+        Constraint::Length(1), // Error/Status Message (second line from bottom)
+        Constraint::Length(1), // Keybinds Help (last line)
     ]);
 
     let chunks = Layout::default()
@@ -49,24 +78,19 @@ pub fn render(app: &mut App, frame: &mut Frame) {
 
     frame.render_widget(input_box, chunks[1]);
 
-    // Render Error Message if present
-    let mut log_chunk_index = 2;
-    if let Some(error_msg) = &app.error_message {
-        let error_widget = Paragraph::new(error_msg.as_str())
-            .style(Style::default().fg(Color::Red))
-            .block(Block::default().borders(Borders::ALL).title(" Error "));
-        frame.render_widget(error_widget, chunks[2]);
-        log_chunk_index = 3;
+    // Render top log level indicator if enabled
+    if log_level_top_enabled {
+        let indicator_text = get_log_level_indicator(app);
+        let indicator_widget = Paragraph::new(indicator_text)
+            .style(Style::default().fg(Color::Cyan))
+            .alignment(ratatui::layout::Alignment::Left);
+        frame.render_widget(indicator_widget, chunks[2]);
     }
-
-    // Calculate indices for notice and keybinds (last two rows)
-    let notice_index = chunks.len() - 2;
-    let keybinds_index = chunks.len() - 1;
 
     // Render Logs Widget
     let logs_guard = app.logs.try_lock();
     if let Ok(logs) = logs_guard {
-        let viewport_height = chunks[log_chunk_index].height.saturating_sub(2) as usize; // -2 for borders
+        let viewport_height = chunks[logs_chunk_index].height.saturating_sub(2) as usize; // -2 for borders
         let logs_len = logs.len();
 
         // Store viewport height for scroll functions to use
@@ -102,7 +126,7 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         // Create list items from visible range
         let mut log_items: Vec<ListItem> = logs[start_offset..end_offset]
             .iter()
-            .map(|l| ListItem::new(format_log_line(l)))
+            .map(|l| ListItem::new(format_log_line(l, app)))
             .collect();
 
         // Add EOF indicator if we've reached the end
@@ -124,28 +148,35 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         let mut state = ListState::default();
         state.select(Some(cursor));
 
-        frame.render_stateful_widget(log_list, chunks[log_chunk_index], &mut state);
+        frame.render_stateful_widget(log_list, chunks[logs_chunk_index], &mut state);
     }
 
-    // Render Notice Message (second line from bottom)
-    let notice_text = get_notice_message(app);
-    let notice_widget = Paragraph::new(notice_text)
-        .style(Style::default().fg(Color::Cyan))
+    // Render bottom log level indicator if enabled
+    if log_level_bottom_enabled {
+        let indicator_text = get_log_level_indicator(app);
+        let indicator_widget = Paragraph::new(indicator_text)
+            .style(Style::default().fg(Color::Cyan))
+            .alignment(ratatui::layout::Alignment::Left);
+        frame.render_widget(indicator_widget, chunks[error_chunk_index - 1]);
+    }
+
+    // Render Error/Status Message (second line from bottom)
+    let error_text = if let Some(error_msg) = &app.error_message {
+        format!("❌ {}", error_msg)
+    } else {
+        String::new()
+    };
+    let error_widget = Paragraph::new(error_text)
+        .style(Style::default().fg(Color::Red))
         .alignment(ratatui::layout::Alignment::Left);
-    frame.render_widget(notice_widget, chunks[notice_index]);
+    frame.render_widget(error_widget, chunks[error_chunk_index]);
 
     // Render Keybinds Help (last line)
     let keybinds_text = get_keybinds_help(app);
     let keybinds_widget = Paragraph::new(keybinds_text)
         .style(Style::default().fg(Color::Gray))
         .alignment(ratatui::layout::Alignment::Left);
-    frame.render_widget(keybinds_widget, chunks[keybinds_index]);
-}
-
-fn get_notice_message(_app: &App) -> String {
-    // You can customize this to show different messages
-    // For example: config loaded, file changed, etc.
-    "✓ Configuration loaded successfully | Ready to tail logs".to_string()
+    frame.render_widget(keybinds_widget, chunks[error_chunk_index + 1]);
 }
 
 fn get_keybinds_help(app: &App) -> String {
@@ -158,33 +189,150 @@ fn get_keybinds_help(app: &App) -> String {
     )
 }
 
-// TODO: Allow Configuration (.toml)
-fn format_log_line(line: &str) -> Line<'_> {
-    let (level, color) = if line.to_uppercase().contains("ERROR") || line.contains(" SEV ") {
-        (" ERROR ", Color::Red)
-    } else if line.to_uppercase().contains("WARN") {
-        (" WARN  ", Color::Yellow)
-    } else if line.to_uppercase().contains("INFO") {
-        (" INFO  ", Color::Green)
-    } else if line.to_uppercase().contains("DEBUG") {
-        (" DEBUG ", Color::Blue)
-    } else {
-        ("", Color::White) // Default for lines without a clear level
+fn get_log_level_indicator(app: &App) -> String {
+    let logs = match app.logs.try_lock() {
+        Ok(logs) => logs,
+        Err(_) => return String::new(),
     };
 
-    if level.is_empty() {
-        Line::from(Span::raw(line))
-    } else {
+    if !app.config.log_level.show_level_counts {
+        return String::new();
+    }
+
+    let mut error_count = 0;
+    let mut warning_count = 0;
+    let mut info_count = 0;
+    let mut debug_count = 0;
+
+    // Count log levels
+    for line in logs.iter() {
+        let line_upper = line.to_uppercase();
+        let mut counted = false;
+
+        // Check error patterns
+        for pattern in &app.config.log_level.levels.error.patterns {
+            if line_upper.contains(&pattern.to_uppercase()) || line.contains(pattern) {
+                error_count += 1;
+                counted = true;
+                break;
+            }
+        }
+
+        if counted {
+            continue;
+        }
+
+        // Check warning patterns
+        for pattern in &app.config.log_level.levels.warning.patterns {
+            if line_upper.contains(&pattern.to_uppercase()) || line.contains(pattern) {
+                warning_count += 1;
+                counted = true;
+                break;
+            }
+        }
+
+        if counted {
+            continue;
+        }
+
+        // Check info patterns
+        for pattern in &app.config.log_level.levels.info.patterns {
+            if line_upper.contains(&pattern.to_uppercase()) || line.contains(pattern) {
+                info_count += 1;
+                counted = true;
+                break;
+            }
+        }
+
+        if counted {
+            continue;
+        }
+
+        // Check debug patterns
+        for pattern in &app.config.log_level.levels.debug.patterns {
+            if line_upper.contains(&pattern.to_uppercase()) || line.contains(pattern) {
+                debug_count += 1;
+                break;
+            }
+        }
+    }
+
+    format!(
+        "Levels: {} ERROR | {} WARNING | {} INFO | {} DEBUG",
+        error_count, warning_count, info_count, debug_count
+    )
+}
+
+fn format_log_line(line: &str, app: &App) -> Line<'static> {
+    let line_upper = line.to_uppercase();
+    let line_owned = line.to_string();
+    let mut matched_level: Option<(String, Color)> = None;
+
+    // Check error patterns
+    for pattern in &app.config.log_level.levels.error.patterns {
+        if line_upper.contains(&pattern.to_uppercase()) || line.contains(pattern) {
+            let color = string_to_color(&app.config.log_level.levels.error.color);
+            matched_level = Some((
+                app.config.log_level.levels.error.display_name.clone(),
+                color,
+            ));
+            break;
+        }
+    }
+
+    // Check warning patterns
+    if matched_level.is_none() {
+        for pattern in &app.config.log_level.levels.warning.patterns {
+            if line_upper.contains(&pattern.to_uppercase()) || line.contains(pattern) {
+                let color = string_to_color(&app.config.log_level.levels.warning.color);
+                matched_level = Some((
+                    app.config.log_level.levels.warning.display_name.clone(),
+                    color,
+                ));
+                break;
+            }
+        }
+    }
+
+    // Check info patterns
+    if matched_level.is_none() {
+        for pattern in &app.config.log_level.levels.info.patterns {
+            if line_upper.contains(&pattern.to_uppercase()) || line.contains(pattern) {
+                let color = string_to_color(&app.config.log_level.levels.info.color);
+                matched_level =
+                    Some((app.config.log_level.levels.info.display_name.clone(), color));
+                break;
+            }
+        }
+    }
+
+    // Check debug patterns
+    if matched_level.is_none() {
+        for pattern in &app.config.log_level.levels.debug.patterns {
+            if line_upper.contains(&pattern.to_uppercase()) || line.contains(pattern) {
+                let color = string_to_color(&app.config.log_level.levels.debug.color);
+                matched_level = Some((
+                    app.config.log_level.levels.debug.display_name.clone(),
+                    color,
+                ));
+                break;
+            }
+        }
+    }
+
+    if let Some((display_name, color)) = matched_level {
         Line::from(vec![
             Span::styled(
-                level,
+                display_name,
                 Style::default()
                     .bg(color)
                     .fg(Color::Black)
                     .add_modifier(Modifier::BOLD),
             ),
             Span::raw(" "),
-            Span::styled(line, Style::default().fg(color)),
+            Span::styled(line_owned, Style::default().fg(color)),
         ])
+    } else {
+        Line::from(Span::raw(line_owned))
     }
 }

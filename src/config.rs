@@ -22,9 +22,67 @@ impl Default for KeybindConfig {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct LogLevelPattern {
+    pub patterns: Vec<String>,
+    pub color: String, // "red", "yellow", "green", "blue", "cyan", "magenta", "white", "gray"
+    pub display_name: String,
+}
+
+impl Default for LogLevelPattern {
+    fn default() -> Self {
+        Self {
+            patterns: vec![],
+            color: "white".to_string(),
+            display_name: "UNKNOWN".to_string(),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct LogLevelsConfig {
+    pub error: LogLevelPattern,
+    pub warning: LogLevelPattern,
+    pub info: LogLevelPattern,
+    pub debug: LogLevelPattern,
+}
+
+impl Default for LogLevelsConfig {
+    fn default() -> Self {
+        Self {
+            error: LogLevelPattern {
+                patterns: vec![
+                    "ERROR".to_string(),
+                    "SEV".to_string(),
+                    "CRITICAL".to_string(),
+                ],
+                color: "red".to_string(),
+                display_name: "ERROR ".to_string(),
+            },
+            warning: LogLevelPattern {
+                patterns: vec!["WARN".to_string(), "WARNING".to_string()],
+                color: "yellow".to_string(),
+                display_name: "WARN  ".to_string(),
+            },
+            info: LogLevelPattern {
+                patterns: vec!["INFO".to_string()],
+                color: "green".to_string(),
+                display_name: "INFO  ".to_string(),
+            },
+            debug: LogLevelPattern {
+                patterns: vec!["DEBUG".to_string(), "TRACE".to_string()],
+                color: "blue".to_string(),
+                display_name: "DEBUG ".to_string(),
+            },
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LogLevelConfig {
     pub enabled: bool,
     pub indicator_position: String, // "top" or "bottom"
+    pub show_level_counts: bool,
+    pub levels: LogLevelsConfig,
 }
 
 impl Default for LogLevelConfig {
@@ -32,6 +90,8 @@ impl Default for LogLevelConfig {
         Self {
             enabled: true,
             indicator_position: "top".to_string(),
+            show_level_counts: true,
+            levels: LogLevelsConfig::default(),
         }
     }
 }
@@ -58,7 +118,6 @@ impl Config {
             match fs::read_to_string(config_path) {
                 Ok(content) => match toml::from_str(&content) {
                     Ok(config) => {
-                        println!("✓ Configuration loaded from: {}", config_path);
                         return config;
                     }
                     Err(e) => {
@@ -80,7 +139,7 @@ impl Config {
             toml::to_string_pretty(&default_config).unwrap(),
         ) {
             Ok(_) => {
-                println!("✓ Default configuration created at: {}", config_path);
+                // Configuration file created silently
             }
             Err(e) => {
                 eprintln!(
@@ -121,5 +180,42 @@ mod tests {
         let toml_str = toml::to_string_pretty(&config).unwrap();
         let parsed: Config = toml::from_str(&toml_str).unwrap();
         assert_eq!(config.keybinds.quit, parsed.keybinds.quit);
+    }
+
+    #[test]
+    fn test_log_level_patterns() {
+        let config = Config::default();
+        assert!(
+            config
+                .log_level
+                .levels
+                .error
+                .patterns
+                .contains(&"ERROR".to_string())
+        );
+        assert!(
+            config
+                .log_level
+                .levels
+                .warning
+                .patterns
+                .contains(&"WARN".to_string())
+        );
+        assert!(
+            config
+                .log_level
+                .levels
+                .info
+                .patterns
+                .contains(&"INFO".to_string())
+        );
+        assert!(
+            config
+                .log_level
+                .levels
+                .debug
+                .patterns
+                .contains(&"DEBUG".to_string())
+        );
     }
 }

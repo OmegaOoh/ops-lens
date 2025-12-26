@@ -62,15 +62,6 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         .block(Block::default().borders(Borders::BOTTOM));
     frame.render_widget(tabs_widget, chunks[1]);
 
-    // Render top log level indicator if enabled
-    if log_level_top_enabled {
-        let indicator_text = get_log_level_indicator(app);
-        let indicator_widget = Paragraph::new(indicator_text)
-            .style(Style::default().fg(Color::Cyan))
-            .alignment(ratatui::layout::Alignment::Left);
-        frame.render_widget(indicator_widget, chunks[2]);
-    }
-
     // Render tab-specific content using the state pattern
     render_current_tab(app, frame, chunks[content_chunk_index]);
 

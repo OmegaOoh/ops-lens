@@ -4,16 +4,11 @@ use ratatui::widgets::ListState;
 use tokio::sync::Mutex;
 
 use crate::config::Config;
+use crate::tabs::TabManager;
 
 pub enum InputMode {
     Normal,
     Edit,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum Tab {
-    LogReader,
-    SimpleTab,
 }
 
 pub struct App {
@@ -24,12 +19,12 @@ pub struct App {
     pub current_path: String,
     pub scroll_state: ListState,
     pub scroll_offset: usize,
-    pub viewport_cursor: usize, // Position of cursor within the viewport (0 to viewport_height-1)
-    pub viewport_height: usize, // Track the current viewport height
+    pub viewport_cursor: usize,
+    pub viewport_height: usize,
     pub auto_scroll: bool,
     pub error_message: Option<String>,
     pub config: Config,
-    pub current_tab: Tab,
+    pub tab_manager: TabManager,
 }
 
 impl App {
@@ -47,7 +42,7 @@ impl App {
             auto_scroll: true,
             error_message: None,
             config: Config::load_or_create("ops-lens.toml"),
-            current_tab: Tab::LogReader,
+            tab_manager: TabManager::new(),
         }
     }
 
@@ -117,9 +112,6 @@ impl App {
     }
 
     pub fn next_tab(&mut self) {
-        self.current_tab = match self.current_tab {
-            Tab::LogReader => Tab::SimpleTab,
-            Tab::SimpleTab => Tab::LogReader,
-        };
+        self.tab_manager.next_tab();
     }
 }

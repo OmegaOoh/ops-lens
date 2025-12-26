@@ -13,6 +13,7 @@ mod app;
 mod config;
 mod keybinds;
 mod log;
+mod tabs;
 mod ui;
 
 use crate::{app::App, keybinds::handle_key_event};

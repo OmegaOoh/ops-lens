@@ -31,6 +31,8 @@ pub async fn handle_key_event(
                 app.scroll_up().await;
             } else if key_char == config.keybinds.scroll_down {
                 app.scroll_down().await;
+            } else if key.code == KeyCode::Tab {
+                app.next_tab();
             }
         }
         InputMode::Edit => match key.code {

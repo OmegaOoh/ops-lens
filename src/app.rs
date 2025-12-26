@@ -10,6 +10,12 @@ pub enum InputMode {
     Edit,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Tab {
+    LogReader,
+    SimpleTab,
+}
+
 pub struct App {
     pub running: bool,
     pub log_file_input: String,
@@ -23,6 +29,7 @@ pub struct App {
     pub auto_scroll: bool,
     pub error_message: Option<String>,
     pub config: Config,
+    pub current_tab: Tab,
 }
 
 impl App {
@@ -40,6 +47,7 @@ impl App {
             auto_scroll: true,
             error_message: None,
             config: Config::load_or_create("ops-lens.toml"),
+            current_tab: Tab::LogReader,
         }
     }
 
@@ -106,5 +114,12 @@ impl App {
 
     pub fn clear_error(&mut self) {
         self.error_message = None;
+    }
+
+    pub fn next_tab(&mut self) {
+        self.current_tab = match self.current_tab {
+            Tab::LogReader => Tab::SimpleTab,
+            Tab::SimpleTab => Tab::LogReader,
+        };
     }
 }

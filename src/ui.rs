@@ -1,10 +1,10 @@
-use crate::app::{App, InputMode};
+use crate::app::{App, InputMode, Tab};
 use ratatui::{
     Frame,
     layout::{Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
+    widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Tabs},
 };
 
 fn string_to_color(color_str: &str) -> Color {
@@ -23,10 +23,10 @@ fn string_to_color(color_str: &str) -> Color {
 }
 
 pub fn render(app: &mut App, frame: &mut Frame) {
-    // Define layout with optional log level indicator
+    // Define layout with tabs
     let mut constraints = vec![
         Constraint::Length(3), // 0: Title
-        Constraint::Max(3),    // 1: Input Box
+        Constraint::Length(2), // 1: Tabs
     ];
 
     let log_level_top_enabled =
@@ -39,8 +39,8 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         constraints.push(Constraint::Length(1)); // 2: Log Level Indicator (top)
     }
 
-    let logs_chunk_index = constraints.len();
-    constraints.push(Constraint::Min(3)); // Logs Widget
+    let content_chunk_index = constraints.len();
+    constraints.push(Constraint::Min(3)); // Content Widget (depends on tab)
 
     // Add log level indicator if enabled and position is "bottom"
     if log_level_bottom_enabled {
@@ -63,6 +63,88 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         .block(Block::default().borders(Borders::ALL));
     frame.render_widget(title, chunks[0]);
 
+    // Render Tabs
+    let tabs = vec!["Log Reader", "Settings"];
+    let selected_tab = match app.current_tab {
+        Tab::LogReader => 0,
+        Tab::SimpleTab => 1,
+    };
+    let tabs_widget = Tabs::new(tabs)
+        .select(selected_tab)
+        .style(Style::default().fg(Color::Gray))
+        .highlight_style(
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        )
+        .block(Block::default().borders(Borders::BOTTOM));
+    frame.render_widget(tabs_widget, chunks[1]);
+
+    // Render top log level indicator if enabled
+    if log_level_top_enabled {
+        let indicator_text = get_log_level_indicator(app);
+        let indicator_widget = Paragraph::new(indicator_text)
+            .style(Style::default().fg(Color::Cyan))
+            .alignment(ratatui::layout::Alignment::Left);
+        frame.render_widget(indicator_widget, chunks[2]);
+    }
+
+    // Render tab-specific content
+    match app.current_tab {
+        Tab::LogReader => render_log_reader_tab(app, frame, chunks[content_chunk_index]),
+        Tab::SimpleTab => render_settings_tab(app, frame, chunks[content_chunk_index]),
+    }
+
+    // Render bottom log level indicator if enabled
+    if log_level_bottom_enabled {
+        let indicator_text = get_log_level_indicator(app);
+        let indicator_widget = Paragraph::new(indicator_text)
+            .style(Style::default().fg(Color::Cyan))
+            .alignment(ratatui::layout::Alignment::Left);
+        frame.render_widget(indicator_widget, chunks[error_chunk_index - 1]);
+    }
+
+    // Render Error/Status Message (second line from bottom)
+    let error_text = if let Some(error_msg) = &app.error_message {
+        format!("❌ {}", error_msg)
+    } else {
+        String::new()
+    };
+    let error_widget = Paragraph::new(error_text)
+        .style(Style::default().fg(Color::Red))
+        .alignment(ratatui::layout::Alignment::Left);
+    frame.render_widget(error_widget, chunks[error_chunk_index]);
+
+    // Render Keybinds Help (last line)
+    let keybinds_text = get_keybinds_help(app);
+    let keybinds_widget = Paragraph::new(keybinds_text)
+        .style(Style::default().fg(Color::Gray))
+        .alignment(ratatui::layout::Alignment::Left);
+    frame.render_widget(keybinds_widget, chunks[error_chunk_index + 1]);
+}
+
+fn render_log_reader_tab(app: &mut App, frame: &mut ratatui::Frame, area: ratatui::prelude::Rect) {
+    // Define layout for log reader tab
+    let mut constraints = vec![
+        Constraint::Max(3), // Input Box
+    ];
+
+    let log_level_top_enabled =
+        app.config.log_level.enabled && app.config.log_level.indicator_position == "top";
+
+    // Add log level indicator if enabled and position is "top"
+    if log_level_top_enabled {
+        constraints.push(Constraint::Length(1)); // Log Level Indicator (top)
+    }
+
+    let logs_chunk_index = constraints.len();
+    constraints.push(Constraint::Min(3)); // Logs Widget
+
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(constraints)
+        .split(area);
+
     // Render Input Box
     let input_style = match app.input_mode {
         InputMode::Normal => Style::default(),
@@ -76,7 +158,7 @@ pub fn render(app: &mut App, frame: &mut Frame) {
             app.current_path
         )));
 
-    frame.render_widget(input_box, chunks[1]);
+    frame.render_widget(input_box, chunks[0]);
 
     // Render top log level indicator if enabled
     if log_level_top_enabled {
@@ -84,7 +166,7 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         let indicator_widget = Paragraph::new(indicator_text)
             .style(Style::default().fg(Color::Cyan))
             .alignment(ratatui::layout::Alignment::Left);
-        frame.render_widget(indicator_widget, chunks[2]);
+        frame.render_widget(indicator_widget, chunks[1]);
     }
 
     // Render Logs Widget
@@ -150,38 +232,49 @@ pub fn render(app: &mut App, frame: &mut Frame) {
 
         frame.render_stateful_widget(log_list, chunks[logs_chunk_index], &mut state);
     }
+}
 
-    // Render bottom log level indicator if enabled
-    if log_level_bottom_enabled {
-        let indicator_text = get_log_level_indicator(app);
-        let indicator_widget = Paragraph::new(indicator_text)
-            .style(Style::default().fg(Color::Cyan))
-            .alignment(ratatui::layout::Alignment::Left);
-        frame.render_widget(indicator_widget, chunks[error_chunk_index - 1]);
-    }
+fn render_settings_tab(app: &App, frame: &mut ratatui::Frame, area: ratatui::prelude::Rect) {
+    let settings_content = vec![
+        Line::from(Span::styled(
+            "Settings",
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        )),
+        Line::from(""),
+        Line::from("Configuration Options:"),
+        Line::from(""),
+        Line::from(Span::raw("• Log Level Detection: ")),
+        if app.config.log_level.enabled {
+            Line::from(Span::styled("  Enabled", Style::default().fg(Color::Green)))
+        } else {
+            Line::from(Span::styled("  Disabled", Style::default().fg(Color::Red)))
+        },
+        Line::from(""),
+        Line::from(Span::raw("• Log Level Indicator Position: ")),
+        Line::from(format!("  {}", app.config.log_level.indicator_position)),
+        Line::from(""),
+        Line::from(Span::raw("• Show Level Counts: ")),
+        if app.config.log_level.show_level_counts {
+            Line::from(Span::styled("  Enabled", Style::default().fg(Color::Green)))
+        } else {
+            Line::from(Span::styled("  Disabled", Style::default().fg(Color::Red)))
+        },
+        Line::from(""),
+        Line::from("Edit the ops-lens.toml file to modify settings."),
+    ];
 
-    // Render Error/Status Message (second line from bottom)
-    let error_text = if let Some(error_msg) = &app.error_message {
-        format!("❌ {}", error_msg)
-    } else {
-        String::new()
-    };
-    let error_widget = Paragraph::new(error_text)
-        .style(Style::default().fg(Color::Red))
-        .alignment(ratatui::layout::Alignment::Left);
-    frame.render_widget(error_widget, chunks[error_chunk_index]);
+    let settings_widget = Paragraph::new(settings_content)
+        .block(Block::default().title(" Settings ").borders(Borders::ALL))
+        .style(Style::default().fg(Color::White));
 
-    // Render Keybinds Help (last line)
-    let keybinds_text = get_keybinds_help(app);
-    let keybinds_widget = Paragraph::new(keybinds_text)
-        .style(Style::default().fg(Color::Gray))
-        .alignment(ratatui::layout::Alignment::Left);
-    frame.render_widget(keybinds_widget, chunks[error_chunk_index + 1]);
+    frame.render_widget(settings_widget, area);
 }
 
 fn get_keybinds_help(app: &App) -> String {
     format!(
-        "[{}] quit | [{}] edit | [{}] scroll-up | [{}] scroll-down",
+        "[{}] quit | [{}] edit | [{}] scroll-up | [{}] scroll-down | [Tab] switch tabs",
         app.config.keybinds.quit,
         app.config.keybinds.edit,
         app.config.keybinds.scroll_up,

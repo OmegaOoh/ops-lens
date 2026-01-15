@@ -73,11 +73,20 @@ impl TabState for PortScannerTab {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints(vec![
-                Constraint::Min(5), // Results list
+                Constraint::Length(3), // Header/Title
+                Constraint::Min(5),    // Results list
+                Constraint::Length(2), // Help text
             ])
             .split(area);
 
-        self.render_results(frame, chunks[0]);
+        // Render header
+        self.render_header(frame, chunks[0]);
+
+        // Render results
+        self.render_results(frame, chunks[1]);
+
+        // Render help text
+        // self.render_help(frame, chunks[2]);
     }
 
     fn help_text(&self) -> Option<&str> {
@@ -86,6 +95,37 @@ impl TabState for PortScannerTab {
 }
 
 impl PortScannerTab {
+    fn render_header(&self, frame: &mut ratatui::Frame, area: Rect) {
+        let title_text = Span::styled(
+            "Local Port Scanner",
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        );
+
+        let port_count = if self.scan_results.is_empty() {
+            "No open ports found".to_string()
+        } else {
+            format!("{} open ports found", self.scan_results.len())
+        };
+
+        let status_text = Span::styled(
+            port_count,
+            Style::default()
+                .fg(Color::Green)
+                .add_modifier(Modifier::BOLD),
+        );
+
+        let header_widget = Paragraph::new(vec![
+            Line::from(title_text),
+            Line::from(""),
+            Line::from(status_text),
+        ])
+        .block(Block::default().borders(Borders::ALL).title(" Scanner "));
+
+        frame.render_widget(header_widget, area);
+    }
+
     fn render_results(&mut self, frame: &mut ratatui::Frame, area: Rect) {
         if self.scan_results.is_empty() {
             let placeholder = Paragraph::new("No open ports found on localhost")
@@ -111,14 +151,18 @@ impl PortScannerTab {
                     Style::default().fg(Color::Cyan),
                 );
 
-                let process_span = Span::raw(format!(
-                    "  {}",
-                    if port_info.process_name == "Unknown" {
-                        port_info.process_name.clone()
-                    } else {
-                        format!("PID: {}", port_info.pid.unwrap_or(0))
-                    }
-                ));
+                let process_info = if port_info.process_name == "Unknown" {
+                    "Unknown".to_string()
+                } else if let Some(pid) = port_info.pid {
+                    format!("{} (PID: {})", port_info.process_name, pid)
+                } else {
+                    port_info.process_name.clone()
+                };
+
+                let process_span = Span::styled(
+                    format!("  {:<40}", process_info),
+                    Style::default().fg(Color::Yellow),
+                );
 
                 ListItem::new(Line::from(vec![
                     port_span,

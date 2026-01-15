@@ -12,10 +12,48 @@ pub struct PortScanner;
 
 impl PortScanner {
     pub fn scan_local_ports() -> Vec<PortInfo> {
-        let mut results = Vec::new();
+        // Determine the operating system and select the appropriate strategy
+        let strategy = if cfg!(target_os = "linux") {
+            LinuxScanner
+        } else {
+            panic!("Unsupported operating system");
+        };
 
-        // Linux ONLY
+        strategy.scan_ports()
+    }
+}
+
+trait ScannerStrategy {
+    fn scan_ports(&self) -> Vec<PortInfo>;
+}
+
+struct LinuxScanner;
+
+impl ScannerStrategy for LinuxScanner {
+    fn scan_ports(&self) -> Vec<PortInfo> {
+        let mut results = Vec::new();
         if let Ok(content) = fs::read_to_string("/proc/net/tcp") {
+            for line in content.lines().skip(1) {
+                // Skip header
+                let parts: Vec<&str> = line.split_whitespace().collect();
+                if parts.len() > 3 {
+                    let local_addr = parts[1];
+                    if let Some(port_hex) = local_addr.split(":").nth(1) {
+                        if let Ok(port) = u16::from_str_radix(port_hex, 16) {
+                            // let inode = parts[9]
+
+                            results.push(PortInfo {
+                                port,
+                                protocol: "TCP".to_string(),
+                                pid: None,
+                                process_name: "Unknown".to_string(),
+                            });
+                        }
+                    }
+                }
+            }
+        }
+        if let Ok(content) = fs::read_to_string("/proc/net/udp") {
             for line in content.lines().skip(1) {
                 // Skip header
                 let parts: Vec<&str> = line.split_whitespace().collect();
@@ -39,3 +77,9 @@ impl PortScanner {
         results
     }
 }
+                                               
+                                                            
+                                                        
+                                                                
+                                                           
+                                                                    

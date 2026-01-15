@@ -1,8 +1,10 @@
 mod log_reader;
+mod port_scanner;
 mod settings;
 mod tab_state;
 
 pub use log_reader::LogReaderTab;
+pub use port_scanner::PortScannerTab;
 pub use settings::SettingsTab;
 pub use tab_state::TabState;
 
@@ -10,6 +12,7 @@ pub use tab_state::TabState;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TabType {
     LogReader,
+    PortScanner,
     Settings,
 }
 
@@ -18,6 +21,7 @@ impl TabType {
     pub fn create_state(&self) -> Box<dyn TabState> {
         match self {
             TabType::LogReader => Box::new(LogReaderTab::new()),
+            TabType::PortScanner => Box::new(PortScannerTab::new()),
             TabType::Settings => Box::new(SettingsTab::new()),
         }
     }
@@ -26,6 +30,7 @@ impl TabType {
     pub fn display_name(&self) -> &'static str {
         match self {
             TabType::LogReader => "Log Reader",
+            TabType::PortScanner => "Port Scanner",
             TabType::Settings => "Settings",
         }
     }
@@ -33,7 +38,8 @@ impl TabType {
     /// Get the next tab in order
     pub fn next(&self) -> Self {
         match self {
-            TabType::LogReader => TabType::Settings,
+            TabType::LogReader => TabType::PortScanner,
+            TabType::PortScanner => TabType::Settings,
             TabType::Settings => TabType::LogReader,
         }
     }
@@ -92,7 +98,8 @@ impl TabManager {
     pub fn current_index(&self) -> usize {
         match self.current_tab_type {
             TabType::LogReader => 0,
-            TabType::Settings => 1,
+            TabType::PortScanner => 1,
+            TabType::Settings => 2,
         }
     }
 
@@ -100,6 +107,7 @@ impl TabManager {
     pub fn tab_names(&self) -> Vec<&'static str> {
         vec![
             TabType::LogReader.display_name(),
+            TabType::PortScanner.display_name(),
             TabType::Settings.display_name(),
         ]
     }

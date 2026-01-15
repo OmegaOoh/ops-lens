@@ -103,6 +103,10 @@ fn render_current_tab(app: &mut App, frame: &mut Frame, area: ratatui::prelude::
             let mut state = crate::tabs::LogReaderTab::new();
             state.render(app, frame, area);
         }
+        crate::tabs::TabType::PortScanner => {
+            let mut state = crate::tabs::PortScannerTab::new();
+            state.render(app, frame, area);
+        }
         crate::tabs::TabType::Settings => {
             let mut state = crate::tabs::SettingsTab::new();
             state.render(app, frame, area);

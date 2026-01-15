@@ -14,6 +14,7 @@ mod config;
 mod keybinds;
 mod log;
 mod port;
+mod strategy;
 mod tabs;
 mod ui;
 

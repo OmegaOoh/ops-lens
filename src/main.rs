@@ -13,6 +13,7 @@ mod app;
 mod config;
 mod keybinds;
 mod log;
+mod port;
 mod tabs;
 mod ui;
 

@@ -4,7 +4,7 @@ use ratatui::widgets::ListState;
 use tokio::sync::Mutex;
 
 use crate::config::Config;
-use crate::tabs::TabManager;
+use crate::tabs::{PortScannerTab, TabManager};
 
 pub enum InputMode {
     Normal,
@@ -13,10 +13,15 @@ pub enum InputMode {
 
 pub struct App {
     pub running: bool,
+    // Logs
     pub log_file_input: String,
     pub input_mode: InputMode,
     pub logs: Arc<Mutex<Vec<String>>>,
     pub current_path: String,
+    // Port Scanner
+    pub port_scanner: PortScannerTab,
+
+    //Utils
     pub scroll_state: ListState,
     pub scroll_offset: usize,
     pub viewport_cursor: usize,
@@ -29,12 +34,16 @@ pub struct App {
 
 impl App {
     pub fn new() -> Self {
+        let mut port_scanner = PortScannerTab::new();
+        port_scanner.perform_scan();
+
         Self {
             running: true,
             log_file_input: String::new(),
             input_mode: InputMode::Normal,
             logs: Arc::new(Mutex::new(Vec::new())),
             current_path: String::from("No file selected"),
+            port_scanner,
             scroll_state: ListState::default(),
             scroll_offset: 0,
             viewport_cursor: 0,
@@ -113,5 +122,13 @@ impl App {
 
     pub fn next_tab(&mut self) {
         self.tab_manager.next_tab();
+    }
+
+    pub fn port_scanner_move_up(&mut self) {
+        self.port_scanner.move_selection_up();
+    }
+
+    pub fn port_scanner_move_down(&mut self) {
+        self.port_scanner.move_selection_down();
     }
 }

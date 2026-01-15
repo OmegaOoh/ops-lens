@@ -1,5 +1,5 @@
 use crate::app::App;
-use crate::tabs::TabState;
+use crate::tabs::{PortScannerTab, TabState};
 use ratatui::{
     Frame,
     layout::{Constraint, Direction, Layout},
@@ -104,8 +104,15 @@ fn render_current_tab(app: &mut App, frame: &mut Frame, area: ratatui::prelude::
             state.render(app, frame, area);
         }
         crate::tabs::TabType::PortScanner => {
-            let mut state = crate::tabs::PortScannerTab::new();
-            state.render(app, frame, area);
+            // Render port scanner without passing mutable app reference
+            let mut port_scanner_state = PortScannerTab {
+                scan_results: app.port_scanner.scan_results.clone(),
+                list_state: app.port_scanner.list_state.clone(),
+                last_scan_count: app.port_scanner.last_scan_count,
+            };
+            port_scanner_state.render(app, frame, area);
+            // Update the port scanner state in app
+            app.port_scanner.list_state = port_scanner_state.list_state;
         }
         crate::tabs::TabType::Settings => {
             let mut state = crate::tabs::SettingsTab::new();

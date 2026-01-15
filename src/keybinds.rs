@@ -1,6 +1,7 @@
 use crate::{
     app::{App, InputMode},
     log::LogReader,
+    tabs::TabType,
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
 
@@ -33,6 +34,18 @@ pub async fn handle_key_event(
                 app.scroll_down().await;
             } else if key.code == KeyCode::Tab {
                 app.next_tab();
+            } else if key.code == KeyCode::Up {
+                if app.tab_manager.current_type() == TabType::PortScanner {
+                    app.port_scanner_move_up();
+                } else {
+                    app.scroll_up().await;
+                }
+            } else if key.code == KeyCode::Down {
+                if app.tab_manager.current_type() == TabType::PortScanner {
+                    app.port_scanner_move_down();
+                } else {
+                    app.scroll_down().await;
+                }
             }
         }
         InputMode::Edit => match key.code {
